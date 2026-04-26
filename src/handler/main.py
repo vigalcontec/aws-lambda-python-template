@@ -18,7 +18,7 @@ settings = Settings()
 
 @logger.inject_lambda_context(log_event=True)
 @tracer.capture_lambda_handler
-def handler(event: dict[str, Any], context: LambdaContext) -> dict[str, Any]:
+def handler(event: dict[str, Any], _context: LambdaContext) -> dict[str, Any]:
     """
     Lambda handler function.
 
@@ -67,7 +67,7 @@ def handler(event: dict[str, Any], context: LambdaContext) -> dict[str, Any]:
 
 
 @tracer.capture_method
-def process_event(event: dict[str, Any], datalake_config: Any) -> dict[str, Any]:
+def process_event(event: dict[str, Any], _datalake_config: Any) -> dict[str, Any]:
     """
     Process the Lambda event.
 

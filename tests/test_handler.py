@@ -1,8 +1,6 @@
 """Tests for Lambda handler."""
 
-import pytest
-
-from handler.utils.ssm import DatalakeConfig, get_datalake_config
+from handler.utils.ssm import get_datalake_config
 
 
 class TestHandler:

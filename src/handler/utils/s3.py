@@ -81,8 +81,8 @@ class S3Client:
         """
         try:
             import pandas as pd
-        except ImportError:
-            raise ImportError("pandas and pyarrow required for Parquet support")
+        except ImportError as err:
+            raise ImportError("pandas and pyarrow required for Parquet support") from err
 
         logger.info(f"Reading Parquet from s3://{self.bucket_name}/{key}")
 
@@ -97,11 +97,10 @@ class S3Client:
             key: S3 object key
             df: Pandas DataFrame to write
         """
+        import importlib.util
         import io
 
-        try:
-            import pandas as pd
-        except ImportError:
+        if importlib.util.find_spec("pandas") is None:
             raise ImportError("pandas and pyarrow required for Parquet support")
 
         logger.info(f"Writing Parquet to s3://{self.bucket_name}/{key}")
