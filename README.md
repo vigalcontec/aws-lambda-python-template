@@ -193,18 +193,23 @@ make docker-build
 | `AWS_REGION` | AWS region | Yes |
 | `LOG_LEVEL` | Logging level (DEBUG/INFO/WARNING/ERROR) | No |
 
-### SSM Parameters (Auto-discovered)
+### Datalake Configuration (Auto-injected)
 
-The Lambda automatically reads these from SSM Parameter Store:
+Terraform reads SSM parameters at deploy time and injects them as Lambda environment variables:
 
-| Parameter | Description |
-|-----------|-------------|
-| `/{env}/datalake/raw/bucket_name` | Raw layer S3 bucket |
-| `/{env}/datalake/raw/kms_key_arn` | Raw layer KMS key |
-| `/{env}/datalake/staging/bucket_name` | Staging layer S3 bucket |
-| `/{env}/datalake/staging/kms_key_arn` | Staging layer KMS key |
-| `/{env}/datalake/business/bucket_name` | Business layer S3 bucket |
-| `/{env}/datalake/business/kms_key_arn` | Business layer KMS key |
+| Environment Variable | Source SSM Parameter |
+|---------------------|----------------------|
+| `RAW_BUCKET_NAME` | `/{env}/datalake/raw/bucket_name` |
+| `RAW_BUCKET_ARN` | `/{env}/datalake/raw/bucket_arn` |
+| `RAW_KMS_KEY_ARN` | `/{env}/datalake/raw/kms_key_arn` |
+| `STAGING_BUCKET_NAME` | `/{env}/datalake/staging/bucket_name` |
+| `STAGING_BUCKET_ARN` | `/{env}/datalake/staging/bucket_arn` |
+| `STAGING_KMS_KEY_ARN` | `/{env}/datalake/staging/kms_key_arn` |
+| `BUSINESS_BUCKET_NAME` | `/{env}/datalake/business/bucket_name` |
+| `BUSINESS_BUCKET_ARN` | `/{env}/datalake/business/bucket_arn` |
+| `BUSINESS_KMS_KEY_ARN` | `/{env}/datalake/business/kms_key_arn` |
+
+> **Note:** Lambda does NOT call SSM at runtime. Terraform reads SSM during deployment and passes values as environment variables for better cold start performance.
 
 ---
 
@@ -263,19 +268,26 @@ make test-integration
 
 ---
 
-## SSM Parameters
+## Datalake Integration
 
-This template is designed to work with the `aws-datalake-layers` infrastructure. It automatically discovers bucket names and KMS keys from SSM Parameter Store.
+This template is designed to work with the `aws-datalake-layers` infrastructure. Terraform reads bucket names and KMS keys from SSM Parameter Store at deploy time and injects them as environment variables.
 
-### Reading Parameters in Code
+### Using Datalake Config in Code
 
 ```python
 from handler.utils.ssm import get_datalake_config
 
-config = get_datalake_config(environment="dev")
+# Reads from environment variables (no SSM call at runtime)
+config = get_datalake_config()
 print(config.raw_bucket_name)
 print(config.raw_kms_key_arn)
 ```
+
+### Benefits
+
+- **Faster cold starts** - No SSM API calls during Lambda initialization
+- **Simpler IAM** - Lambda doesn't need SSM read permissions at runtime
+- **Easier testing** - Just set environment variables in tests
 
 ---
 

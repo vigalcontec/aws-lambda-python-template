@@ -11,7 +11,7 @@ from moto import mock_aws
 
 @pytest.fixture(autouse=True)
 def aws_credentials() -> Generator[None, None, None]:
-    """Mock AWS credentials for moto."""
+    """Mock AWS credentials and datalake environment variables."""
     with patch.dict(
         os.environ,
         {
@@ -21,6 +21,16 @@ def aws_credentials() -> Generator[None, None, None]:
             "AWS_SESSION_TOKEN": "testing",
             "AWS_DEFAULT_REGION": "eu-west-1",
             "ENVIRONMENT": "dev",
+            # Datalake configuration (simulates Lambda environment variables)
+            "RAW_BUCKET_NAME": "datalake-raw-test-dev-123456789012",
+            "RAW_BUCKET_ARN": "arn:aws:s3:::datalake-raw-test-dev-123456789012",
+            "RAW_KMS_KEY_ARN": "arn:aws:kms:eu-west-1:123456789012:key/raw-key",
+            "STAGING_BUCKET_NAME": "datalake-staging-test-dev-123456789012",
+            "STAGING_BUCKET_ARN": "arn:aws:s3:::datalake-staging-test-dev-123456789012",
+            "STAGING_KMS_KEY_ARN": "arn:aws:kms:eu-west-1:123456789012:key/staging-key",
+            "BUSINESS_BUCKET_NAME": "datalake-business-test-dev-123456789012",
+            "BUSINESS_BUCKET_ARN": "arn:aws:s3:::datalake-business-test-dev-123456789012",
+            "BUSINESS_KMS_KEY_ARN": "arn:aws:kms:eu-west-1:123456789012:key/business-key",
         },
     ):
         yield
@@ -31,31 +41,6 @@ def s3_client() -> Generator[boto3.client, None, None]:
     """Create mocked S3 client."""
     with mock_aws():
         client = boto3.client("s3", region_name="eu-west-1")
-        yield client
-
-
-@pytest.fixture
-def ssm_client() -> Generator[boto3.client, None, None]:
-    """Create mocked SSM client with datalake parameters."""
-    with mock_aws():
-        client = boto3.client("ssm", region_name="eu-west-1")
-
-        # Create datalake SSM parameters
-        params = {
-            "/dev/datalake/raw/bucket_name": "datalake-raw-test-dev-123456789012",
-            "/dev/datalake/raw/bucket_arn": "arn:aws:s3:::datalake-raw-test-dev-123456789012",
-            "/dev/datalake/raw/kms_key_arn": "arn:aws:kms:eu-west-1:123456789012:key/raw-key",
-            "/dev/datalake/staging/bucket_name": "datalake-staging-test-dev-123456789012",
-            "/dev/datalake/staging/bucket_arn": "arn:aws:s3:::datalake-staging-test-dev-123456789012",
-            "/dev/datalake/staging/kms_key_arn": "arn:aws:kms:eu-west-1:123456789012:key/staging-key",
-            "/dev/datalake/business/bucket_name": "datalake-business-test-dev-123456789012",
-            "/dev/datalake/business/bucket_arn": "arn:aws:s3:::datalake-business-test-dev-123456789012",
-            "/dev/datalake/business/kms_key_arn": "arn:aws:kms:eu-west-1:123456789012:key/business-key",
-        }
-
-        for name, value in params.items():
-            client.put_parameter(Name=name, Value=value, Type="SecureString")
-
         yield client
 
 

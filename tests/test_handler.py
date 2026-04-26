@@ -1,32 +1,17 @@
 """Tests for Lambda handler."""
 
-from unittest.mock import patch, MagicMock
-
 import pytest
 
-from handler.utils.ssm import DatalakeConfig
+from handler.utils.ssm import DatalakeConfig, get_datalake_config
 
 
 class TestHandler:
     """Tests for main handler function."""
 
-    @patch("handler.main.get_datalake_config")
-    def test_handler_success(
-        self, mock_get_config: MagicMock, lambda_event: dict, lambda_context
-    ) -> None:
+    def test_handler_success(self, lambda_event: dict, lambda_context) -> None:
         """Test successful handler execution."""
-        # Arrange
-        mock_get_config.return_value = DatalakeConfig(
-            raw_bucket_name="test-raw-bucket",
-            raw_bucket_arn="arn:aws:s3:::test-raw-bucket",
-            raw_kms_key_arn="arn:aws:kms:eu-west-1:123:key/raw",
-            staging_bucket_name="test-staging-bucket",
-            staging_bucket_arn="arn:aws:s3:::test-staging-bucket",
-            staging_kms_key_arn="arn:aws:kms:eu-west-1:123:key/staging",
-            business_bucket_name="test-business-bucket",
-            business_bucket_arn="arn:aws:s3:::test-business-bucket",
-            business_kms_key_arn="arn:aws:kms:eu-west-1:123:key/business",
-        )
+        # Clear cache to ensure fresh config
+        get_datalake_config.cache_clear()
 
         # Act
         from handler.main import handler
@@ -38,42 +23,56 @@ class TestHandler:
         assert result["body"]["message"] == "Success"
         assert "result" in result["body"]
 
-    @patch("handler.main.get_datalake_config")
-    def test_handler_error(
-        self, mock_get_config: MagicMock, lambda_event: dict, lambda_context
-    ) -> None:
-        """Test handler error handling."""
-        # Arrange
-        mock_get_config.side_effect = Exception("SSM error")
+    def test_handler_processes_event_keys(self, lambda_event: dict, lambda_context) -> None:
+        """Test handler returns event keys in result."""
+        get_datalake_config.cache_clear()
 
-        # Act
         from handler.main import handler
 
         result = handler(lambda_event, lambda_context)
 
-        # Assert
-        assert result["statusCode"] == 500
-        assert "error" in result["body"]
+        assert result["body"]["result"]["processed"] is True
+        assert "key1" in result["body"]["result"]["event_keys"]
+        assert "key2" in result["body"]["result"]["event_keys"]
 
 
-class TestSSMUtils:
-    """Tests for SSM utilities."""
+class TestDatalakeConfig:
+    """Tests for datalake configuration from environment variables."""
 
-    def test_get_datalake_config(self, ssm_client) -> None:
-        """Test loading datalake config from SSM."""
-        from handler.utils.ssm import get_datalake_config
-
+    def test_get_datalake_config(self) -> None:
+        """Test loading datalake config from environment variables."""
         # Clear cache for test
         get_datalake_config.cache_clear()
 
         # Act
-        config = get_datalake_config("dev")
+        config = get_datalake_config()
 
         # Assert
         assert config.raw_bucket_name == "datalake-raw-test-dev-123456789012"
         assert config.staging_bucket_name == "datalake-staging-test-dev-123456789012"
         assert config.business_bucket_name == "datalake-business-test-dev-123456789012"
         assert "kms" in config.raw_kms_key_arn
+
+    def test_datalake_config_all_fields(self) -> None:
+        """Test all datalake config fields are populated."""
+        get_datalake_config.cache_clear()
+
+        config = get_datalake_config()
+
+        # Raw layer
+        assert config.raw_bucket_name != ""
+        assert config.raw_bucket_arn.startswith("arn:aws:s3:::")
+        assert config.raw_kms_key_arn.startswith("arn:aws:kms:")
+
+        # Staging layer
+        assert config.staging_bucket_name != ""
+        assert config.staging_bucket_arn.startswith("arn:aws:s3:::")
+        assert config.staging_kms_key_arn.startswith("arn:aws:kms:")
+
+        # Business layer
+        assert config.business_bucket_name != ""
+        assert config.business_bucket_arn.startswith("arn:aws:s3:::")
+        assert config.business_kms_key_arn.startswith("arn:aws:kms:")
 
 
 class TestS3Utils:

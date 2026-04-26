@@ -43,32 +43,6 @@ resource "aws_iam_role_policy_attachment" "lambda_xray" {
 }
 
 # -----------------------------------------------------------------------------
-# SSM Parameter Store Access
-# -----------------------------------------------------------------------------
-resource "aws_iam_role_policy" "ssm_access" {
-  name = "${local.full_name}-ssm"
-  role = aws_iam_role.lambda.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "SSMGetParameters"
-        Effect = "Allow"
-        Action = [
-          "ssm:GetParameter",
-          "ssm:GetParameters",
-          "ssm:GetParametersByPath"
-        ]
-        Resource = [
-          "arn:aws:ssm:${local.aws_region}:${local.account_id}:parameter/${var.environment}/datalake/*"
-        ]
-      }
-    ]
-  })
-}
-
-# -----------------------------------------------------------------------------
 # S3 Access to Datalake Buckets
 # -----------------------------------------------------------------------------
 resource "aws_iam_role_policy" "s3_access" {

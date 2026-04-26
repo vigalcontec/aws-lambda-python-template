@@ -32,8 +32,8 @@ def handler(event: dict[str, Any], context: LambdaContext) -> dict[str, Any]:
     logger.info("Processing event", extra={"environment": settings.environment})
 
     try:
-        # Get datalake configuration from SSM
-        datalake_config = get_datalake_config(settings.environment)
+        # Get datalake configuration from environment variables
+        datalake_config = get_datalake_config()
 
         logger.info(
             "Datalake configuration loaded",
