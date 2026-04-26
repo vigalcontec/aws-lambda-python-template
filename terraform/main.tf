@@ -1,0 +1,128 @@
+# =============================================================================
+# AWS Lambda with ECR Container Image
+# =============================================================================
+
+terraform {
+  required_version = ">= 1.10.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = local.aws_region
+
+  default_tags {
+    tags = local.common_tags
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Data Sources
+# -----------------------------------------------------------------------------
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
+# -----------------------------------------------------------------------------
+# ECR Repository
+# -----------------------------------------------------------------------------
+resource "aws_ecr_repository" "lambda" {
+  name                 = local.full_name
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  encryption_configuration {
+    encryption_type = "KMS"
+  }
+
+  tags = {
+    Name = local.full_name
+  }
+}
+
+resource "aws_ecr_lifecycle_policy" "lambda" {
+  repository = aws_ecr_repository.lambda.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep last 10 images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 10
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}
+
+# -----------------------------------------------------------------------------
+# Lambda Function
+# -----------------------------------------------------------------------------
+resource "aws_lambda_function" "main" {
+  function_name = local.full_name
+  role          = aws_iam_role.lambda.arn
+  package_type  = "Image"
+  image_uri     = "${aws_ecr_repository.lambda.repository_url}:${var.image_tag}"
+
+  timeout     = local.timeout
+  memory_size = local.memory_size
+
+  environment {
+    variables = {
+      ENVIRONMENT                  = var.environment
+      AWS_REGION                   = local.aws_region
+      LOG_LEVEL                    = local.log_level
+      POWERTOOLS_SERVICE_NAME      = local.function_name
+      POWERTOOLS_METRICS_NAMESPACE = local.project_name
+    }
+  }
+
+  tracing_config {
+    mode = "Active"
+  }
+
+  tags = {
+    Name = local.full_name
+  }
+
+  depends_on = [
+    aws_cloudwatch_log_group.lambda
+  ]
+}
+
+# -----------------------------------------------------------------------------
+# CloudWatch Log Group
+# -----------------------------------------------------------------------------
+resource "aws_cloudwatch_log_group" "lambda" {
+  name              = "/aws/lambda/${local.full_name}"
+  retention_in_days = local.log_retention_days
+
+  tags = {
+    Name = local.full_name
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Lambda Permission (for triggers - customize as needed)
+# -----------------------------------------------------------------------------
+# Example: S3 trigger
+# resource "aws_lambda_permission" "s3" {
+#   statement_id  = "AllowS3Invoke"
+#   action        = "lambda:InvokeFunction"
+#   function_name = aws_lambda_function.main.function_name
+#   principal     = "s3.amazonaws.com"
+#   source_arn    = local.datalake.raw.bucket_arn
+# }
