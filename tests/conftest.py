@@ -5,11 +5,11 @@ import os
 # Disable X-Ray tracing before importing any modules
 os.environ["POWERTOOLS_TRACE_DISABLED"] = "true"
 
-from collections.abc import Generator
-from typing import Any
-from unittest.mock import patch
+from collections.abc import Generator  # noqa: E402
+from typing import Any  # noqa: E402
+from unittest.mock import patch  # noqa: E402
 
-import pytest
+import pytest  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
