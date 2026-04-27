@@ -11,6 +11,7 @@ on:
     branches: [main, develop, "feature/*", "release/*"]
     paths:
       - 'src/**'
+      - 'tests/**'
       - 'Dockerfile'
       - 'pyproject.toml'
       - 'poetry.lock'
@@ -20,6 +21,7 @@ on:
     branches: [main, develop]
     paths:
       - 'src/**'
+      - 'tests/**'
       - 'Dockerfile'
       - 'pyproject.toml'
       - 'terraform/**'
