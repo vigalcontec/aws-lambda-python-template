@@ -1,6 +1,5 @@
 """Utility modules."""
 
-from handler.utils.s3 import S3Client
-from handler.utils.ssm import DatalakeConfig, get_datalake_config
+from handler.utils.ssm import get_parameter, get_parameters_by_path
 
-__all__ = ["S3Client", "get_datalake_config", "DatalakeConfig"]
+__all__ = ["get_parameter", "get_parameters_by_path"]

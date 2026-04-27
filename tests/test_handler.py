@@ -1,136 +1,174 @@
 """Tests for Lambda handler."""
 
-from handler.utils.ssm import get_datalake_config
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+from handler.config import Settings, get_settings
 
 
 class TestHandler:
     """Tests for main handler function."""
 
-    def test_handler_success(self, lambda_event: dict, lambda_context) -> None:
+    def test_handler_success(self, lambda_event: dict[str, Any], lambda_context: Any) -> None:
         """Test successful handler execution."""
-        # Clear cache to ensure fresh config
-        get_datalake_config.cache_clear()
+        get_settings.cache_clear()
 
-        # Act
         from handler.main import handler
 
         result = handler(lambda_event, lambda_context)
 
-        # Assert
         assert result["statusCode"] == 200
         assert result["body"]["message"] == "Success"
-        assert "result" in result["body"]
+        assert result["body"]["event"] == lambda_event
 
-    def test_handler_processes_event_keys(self, lambda_event: dict, lambda_context) -> None:
-        """Test handler returns event keys in result."""
-        get_datalake_config.cache_clear()
+    def test_handler_returns_event(
+        self, lambda_event: dict[str, Any], lambda_context: Any
+    ) -> None:
+        """Test handler returns the event."""
+        get_settings.cache_clear()
 
         from handler.main import handler
 
         result = handler(lambda_event, lambda_context)
 
-        assert result["body"]["result"]["processed"] is True
-        assert "key1" in result["body"]["result"]["event_keys"]
-        assert "key2" in result["body"]["result"]["event_keys"]
+        assert result["body"]["event"]["key1"] == "value1"
+        assert result["body"]["event"]["key2"] == "value2"
+
+    def test_handler_empty_event(self, lambda_context: Any) -> None:
+        """Test handler with empty event."""
+        get_settings.cache_clear()
+
+        from handler.main import handler
+
+        result = handler({}, lambda_context)
+
+        assert result["statusCode"] == 200
+        assert result["body"]["event"] == {}
 
 
-class TestDatalakeConfig:
-    """Tests for datalake configuration from environment variables."""
+class TestConfig:
+    """Tests for configuration."""
 
-    def test_get_datalake_config(self) -> None:
-        """Test loading datalake config from environment variables."""
-        # Clear cache for test
-        get_datalake_config.cache_clear()
+    def test_get_settings_returns_settings(self) -> None:
+        """Test get_settings returns Settings instance."""
+        get_settings.cache_clear()
+        settings = get_settings()
 
-        # Act
-        config = get_datalake_config()
+        assert isinstance(settings, Settings)
 
-        # Assert
-        assert config.raw_bucket_name == "datalake-raw-test-dev-123456789012"
-        assert config.staging_bucket_name == "datalake-staging-test-dev-123456789012"
-        assert config.business_bucket_name == "datalake-business-test-dev-123456789012"
-        assert "kms" in config.raw_kms_key_arn
+    def test_get_settings_cached(self) -> None:
+        """Test get_settings returns cached instance."""
+        get_settings.cache_clear()
+        settings1 = get_settings()
+        settings2 = get_settings()
 
-    def test_datalake_config_all_fields(self) -> None:
-        """Test all datalake config fields are populated."""
-        get_datalake_config.cache_clear()
+        assert settings1 is settings2
 
-        config = get_datalake_config()
+    def test_settings_default_values(self) -> None:
+        """Test Settings has correct default values."""
+        get_settings.cache_clear()
+        settings = get_settings()
 
-        # Raw layer
-        assert config.raw_bucket_name != ""
-        assert config.raw_bucket_arn.startswith("arn:aws:s3:::")
-        assert config.raw_kms_key_arn.startswith("arn:aws:kms:")
+        assert settings.environment == "dev"
+        assert settings.aws_region == "eu-west-1"
+        assert settings.log_level == "INFO"
 
-        # Staging layer
-        assert config.staging_bucket_name != ""
-        assert config.staging_bucket_arn.startswith("arn:aws:s3:::")
-        assert config.staging_kms_key_arn.startswith("arn:aws:kms:")
+    def test_settings_from_env(self) -> None:
+        """Test Settings reads from environment variables."""
+        import os
+        from unittest.mock import patch
 
-        # Business layer
-        assert config.business_bucket_name != ""
-        assert config.business_bucket_arn.startswith("arn:aws:s3:::")
-        assert config.business_kms_key_arn.startswith("arn:aws:kms:")
+        with patch.dict(os.environ, {"ENVIRONMENT": "prod", "LOG_LEVEL": "DEBUG"}):
+            get_settings.cache_clear()
+            settings = get_settings()
+
+            assert settings.environment == "prod"
+            assert settings.log_level == "DEBUG"
 
 
-class TestS3Utils:
-    """Tests for S3 utilities."""
+class TestSSMUtils:
+    """Tests for SSM utilities."""
 
-    def test_s3_client_init(self) -> None:
-        """Test S3 client initialization."""
-        from handler.utils.s3 import S3Client
+    @patch("handler.utils.ssm.boto3.client")
+    def test_get_parameter(self, mock_boto_client: MagicMock) -> None:
+        """Test get_parameter fetches from SSM."""
+        from handler.utils.ssm import get_parameter
 
-        client = S3Client(
-            bucket_name="test-bucket",
-            kms_key_arn="arn:aws:kms:eu-west-1:123:key/test",
-        )
+        # Clear cache
+        get_parameter.cache_clear()
 
-        assert client.bucket_name == "test-bucket"
-        assert client.kms_key_arn == "arn:aws:kms:eu-west-1:123:key/test"
-
-    def test_read_json(self, s3_client) -> None:
-        """Test reading JSON from S3."""
-        import json
-
-        from handler.utils.s3 import S3Client
-
-        # Arrange
-        bucket_name = "test-bucket"
-        s3_client.create_bucket(
-            Bucket=bucket_name,
-            CreateBucketConfiguration={"LocationConstraint": "eu-west-1"},
-        )
-        s3_client.put_object(
-            Bucket=bucket_name,
-            Key="test.json",
-            Body=json.dumps({"key": "value"}),
-        )
+        # Setup mock
+        mock_ssm = MagicMock()
+        mock_boto_client.return_value = mock_ssm
+        mock_ssm.get_parameter.return_value = {
+            "Parameter": {"Value": "test-value"}
+        }
 
         # Act
-        client = S3Client(bucket_name=bucket_name)
-        result = client.read_json("test.json")
+        result = get_parameter("/dev/my-app/secret")
 
         # Assert
-        assert result == {"key": "value"}
-
-    def test_write_json(self, s3_client) -> None:
-        """Test writing JSON to S3."""
-        import json
-
-        from handler.utils.s3 import S3Client
-
-        # Arrange
-        bucket_name = "test-bucket"
-        s3_client.create_bucket(
-            Bucket=bucket_name,
-            CreateBucketConfiguration={"LocationConstraint": "eu-west-1"},
+        assert result == "test-value"
+        mock_ssm.get_parameter.assert_called_once_with(
+            Name="/dev/my-app/secret", WithDecryption=True
         )
 
-        # Act
-        client = S3Client(bucket_name=bucket_name)
-        client.write_json("output.json", {"result": "success"})
+    @patch("handler.utils.ssm.boto3.client")
+    def test_get_parameter_no_decrypt(self, mock_boto_client: MagicMock) -> None:
+        """Test get_parameter with decrypt=False."""
+        from handler.utils.ssm import get_parameter
 
-        # Assert
-        response = s3_client.get_object(Bucket=bucket_name, Key="output.json")
-        content = json.loads(response["Body"].read().decode("utf-8"))
-        assert content == {"result": "success"}
+        get_parameter.cache_clear()
+
+        mock_ssm = MagicMock()
+        mock_boto_client.return_value = mock_ssm
+        mock_ssm.get_parameter.return_value = {
+            "Parameter": {"Value": "plain-value"}
+        }
+
+        result = get_parameter("/dev/my-app/config", decrypt=False)
+
+        assert result == "plain-value"
+        mock_ssm.get_parameter.assert_called_once_with(
+            Name="/dev/my-app/config", WithDecryption=False
+        )
+
+    @patch("handler.utils.ssm.boto3.client")
+    def test_get_parameters_by_path(self, mock_boto_client: MagicMock) -> None:
+        """Test get_parameters_by_path fetches all parameters under path."""
+        from handler.utils.ssm import get_parameters_by_path
+
+        mock_ssm = MagicMock()
+        mock_boto_client.return_value = mock_ssm
+
+        # Setup paginator mock
+        mock_paginator = MagicMock()
+        mock_ssm.get_paginator.return_value = mock_paginator
+        mock_paginator.paginate.return_value = [
+            {
+                "Parameters": [
+                    {"Name": "/dev/my-app/db-host", "Value": "localhost"},
+                    {"Name": "/dev/my-app/db-port", "Value": "5432"},
+                ]
+            }
+        ]
+
+        result = get_parameters_by_path("/dev/my-app/")
+
+        assert result == {"db-host": "localhost", "db-port": "5432"}
+
+    @patch("handler.utils.ssm.boto3.client")
+    def test_get_parameters_by_path_empty(self, mock_boto_client: MagicMock) -> None:
+        """Test get_parameters_by_path with no parameters."""
+        from handler.utils.ssm import get_parameters_by_path
+
+        mock_ssm = MagicMock()
+        mock_boto_client.return_value = mock_ssm
+
+        mock_paginator = MagicMock()
+        mock_ssm.get_paginator.return_value = mock_paginator
+        mock_paginator.paginate.return_value = [{"Parameters": []}]
+
+        result = get_parameters_by_path("/dev/empty/")
+
+        assert result == {}

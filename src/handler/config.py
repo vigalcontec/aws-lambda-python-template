@@ -6,24 +6,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """
+    Application settings loaded from environment variables.
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-    )
+    These are set by Terraform in the Lambda function configuration.
+    See terraform/main.tf for the environment variables.
+    """
 
-    # Environment
+    model_config = SettingsConfigDict(case_sensitive=False)
+
+    # From Terraform environment variables
     environment: str = "dev"
     aws_region: str = "eu-west-1"
-
-    # Logging
     log_level: str = "INFO"
-    powertools_service_name: str = "my-lambda-function"
-
-    # Feature flags
-    enable_tracing: bool = True
 
 
 @lru_cache

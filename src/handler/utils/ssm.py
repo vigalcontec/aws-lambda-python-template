@@ -1,54 +1,50 @@
-"""Datalake configuration from environment variables."""
+"""SSM Parameter Store utilities (example for reading parameters at runtime)."""
 
-import os
-from dataclasses import dataclass
 from functools import lru_cache
 
+import boto3
 from aws_lambda_powertools import Logger
 
 logger = Logger()
 
 
-@dataclass
-class DatalakeConfig:
-    """Datalake configuration from environment variables."""
-
-    # Raw layer
-    raw_bucket_name: str
-    raw_bucket_arn: str
-    raw_kms_key_arn: str
-
-    # Staging layer
-    staging_bucket_name: str
-    staging_bucket_arn: str
-    staging_kms_key_arn: str
-
-    # Business layer
-    business_bucket_name: str
-    business_bucket_arn: str
-    business_kms_key_arn: str
-
-
-@lru_cache(maxsize=1)
-def get_datalake_config() -> DatalakeConfig:
+@lru_cache(maxsize=32)
+def get_parameter(name: str, decrypt: bool = True) -> str:
     """
-    Get datalake configuration from environment variables.
+    Get a parameter from SSM Parameter Store.
 
-    Environment variables are set by Terraform from SSM parameters.
+    Args:
+        name: Parameter name (e.g., "/dev/my-app/database-url")
+        decrypt: Whether to decrypt SecureString parameters
 
     Returns:
-        DatalakeConfig with all bucket names and KMS key ARNs
+        Parameter value
     """
-    logger.info("Loading datalake config from environment variables")
+    ssm = boto3.client("ssm")
+    response = ssm.get_parameter(Name=name, WithDecryption=decrypt)
+    return str(response["Parameter"]["Value"])
 
-    return DatalakeConfig(
-        raw_bucket_name=os.environ.get("RAW_BUCKET_NAME", ""),
-        raw_bucket_arn=os.environ.get("RAW_BUCKET_ARN", ""),
-        raw_kms_key_arn=os.environ.get("RAW_KMS_KEY_ARN", ""),
-        staging_bucket_name=os.environ.get("STAGING_BUCKET_NAME", ""),
-        staging_bucket_arn=os.environ.get("STAGING_BUCKET_ARN", ""),
-        staging_kms_key_arn=os.environ.get("STAGING_KMS_KEY_ARN", ""),
-        business_bucket_name=os.environ.get("BUSINESS_BUCKET_NAME", ""),
-        business_bucket_arn=os.environ.get("BUSINESS_BUCKET_ARN", ""),
-        business_kms_key_arn=os.environ.get("BUSINESS_KMS_KEY_ARN", ""),
-    )
+
+def get_parameters_by_path(path: str, decrypt: bool = True) -> dict[str, str]:
+    """
+    Get all parameters under a path from SSM Parameter Store.
+
+    Args:
+        path: Parameter path prefix (e.g., "/dev/my-app/")
+        decrypt: Whether to decrypt SecureString parameters
+
+    Returns:
+        Dictionary of parameter names to values
+    """
+    ssm = boto3.client("ssm")
+    paginator = ssm.get_paginator("get_parameters_by_path")
+
+    params: dict[str, str] = {}
+    for page in paginator.paginate(Path=path, WithDecryption=decrypt, Recursive=True):
+        for param in page["Parameters"]:
+            # Extract just the parameter name (last part of path)
+            name = param["Name"].split("/")[-1]
+            params[name] = param["Value"]
+
+    logger.info(f"Loaded {len(params)} parameters from {path}")
+    return params

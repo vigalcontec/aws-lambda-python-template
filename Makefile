@@ -29,8 +29,8 @@ test: ## Run tests
 test-verbose: ## Run tests with verbose output
 	poetry run pytest -v --tb=long
 
-coverage: ## Run tests with coverage report
-	poetry run pytest --cov=src --cov-report=html --cov-report=term
+coverage: ## Run tests with coverage report (80% minimum)
+	poetry run pytest --cov=src --cov-report=html --cov-report=term --cov-fail-under=80
 	@echo "Coverage report: htmlcov/index.html"
 
 # ─────────────────────────────────────────────────────────────────────────────
