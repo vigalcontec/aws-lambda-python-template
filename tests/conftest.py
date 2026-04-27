@@ -1,6 +1,10 @@
 """Pytest fixtures and configuration."""
 
 import os
+
+# Disable X-Ray tracing before importing any modules
+os.environ["POWERTOOLS_TRACE_DISABLED"] = "true"
+
 from collections.abc import Generator
 from typing import Any
 from unittest.mock import patch
