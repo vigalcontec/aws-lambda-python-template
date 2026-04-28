@@ -6,7 +6,7 @@
 # Lambda Execution Role
 # -----------------------------------------------------------------------------
 resource "aws_iam_role" "lambda" {
-  name = "${local.full_name}-role"
+  name = "${local.full_name}-lambda"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -22,7 +22,7 @@ resource "aws_iam_role" "lambda" {
   })
 
   tags = merge(local.common_tags, {
-    Name = "${local.full_name}-role"
+    Name = "${local.full_name}-lambda"
   })
 }
 
