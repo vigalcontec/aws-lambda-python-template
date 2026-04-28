@@ -71,7 +71,6 @@ resource "aws_lambda_function" "main" {
   environment {
     variables = {
       ENVIRONMENT                  = var.environment
-      AWS_REGION                   = local.aws_region
       LOG_LEVEL                    = local.log_level
       POWERTOOLS_SERVICE_NAME      = local.function_name
       POWERTOOLS_METRICS_NAMESPACE = local.project_name
