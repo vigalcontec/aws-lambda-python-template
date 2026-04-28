@@ -25,12 +25,12 @@ output "function_invoke_arn" {
 # -----------------------------------------------------------------------------
 output "ecr_repository_url" {
   description = "ECR repository URL"
-  value       = aws_ecr_repository.lambda.repository_url
+  value       = data.aws_ecr_repository.lambda.repository_url
 }
 
 output "ecr_repository_arn" {
   description = "ECR repository ARN"
-  value       = aws_ecr_repository.lambda.arn
+  value       = data.aws_ecr_repository.lambda.arn
 }
 
 # -----------------------------------------------------------------------------

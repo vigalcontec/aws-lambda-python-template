@@ -28,27 +28,15 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 # -----------------------------------------------------------------------------
-# ECR Repository
+# ECR Repository (created by CI/CD via AWS CLI, referenced here)
 # -----------------------------------------------------------------------------
-resource "aws_ecr_repository" "lambda" {
-  name                 = local.full_name
-  image_tag_mutability = "MUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-
-  encryption_configuration {
-    encryption_type = "KMS"
-  }
-
-  tags = {
-    Name = local.full_name
-  }
+data "aws_ecr_repository" "lambda" {
+  name = local.full_name
 }
 
+# Lifecycle policy for the ECR repository
 resource "aws_ecr_lifecycle_policy" "lambda" {
-  repository = aws_ecr_repository.lambda.name
+  repository = data.aws_ecr_repository.lambda.name
 
   policy = jsonencode({
     rules = [
@@ -75,7 +63,7 @@ resource "aws_lambda_function" "main" {
   function_name = local.full_name
   role          = aws_iam_role.lambda.arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.lambda.repository_url}:${var.image_tag}"
+  image_uri     = "${data.aws_ecr_repository.lambda.repository_url}:${var.image_tag}"
 
   timeout     = local.timeout
   memory_size = local.memory_size

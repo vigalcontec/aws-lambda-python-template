@@ -169,11 +169,21 @@ jobs:
           echo "function_name=${FUNCTION_NAME}" >> $GITHUB_OUTPUT
           echo "company_name=${COMPANY_NAME}" >> $GITHUB_OUTPUT
 
-      - name: Get ECR Repository
+      - name: Create ECR Repository
         id: ecr
         run: |
           REPO_NAME="${{ steps.config.outputs.function_name }}-${{ env.ENV }}"
           REPO_URI="${{ steps.ecr-login.outputs.registry }}/${REPO_NAME}"
+          
+          # Create ECR repository if it doesn't exist
+          aws ecr describe-repositories --repository-names "${REPO_NAME}" 2>/dev/null || \
+          aws ecr create-repository \
+            --repository-name "${REPO_NAME}" \
+            --image-scanning-configuration scanOnPush=true \
+            --encryption-configuration encryptionType=AES256 \
+            --tags Key=Environment,Value=${{ env.ENV }} Key=Project,Value=${{ steps.config.outputs.function_name }}
+          
+          echo "repo_name=${REPO_NAME}" >> $GITHUB_OUTPUT
           echo "repo_uri=${REPO_URI}" >> $GITHUB_OUTPUT
 
       - name: Build and Push
