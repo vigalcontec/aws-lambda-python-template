@@ -137,7 +137,17 @@ name = "my-data-processor"
 poetry install
 ```
 
-### 4. Run Locally
+### 4. Generate Lock File (Required for Docker)
+
+The `poetry.lock` file must exist before building the Docker image:
+
+```bash
+poetry lock
+```
+
+> **Important:** Commit `poetry.lock` to your repository. The Docker build will fail without it.
+
+### 5. Run Locally
 
 ```bash
 # Using Docker
