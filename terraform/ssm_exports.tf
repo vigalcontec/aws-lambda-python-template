@@ -36,17 +36,6 @@ resource "aws_ssm_parameter" "invoke_arn" {
   })
 }
 
-resource "aws_ssm_parameter" "ecr_repository_url" {
-  name        = "/${var.environment}/lambda/${local.function_name}/ecr_repository_url"
-  description = "ECR repository URL for ${local.function_name}"
-  type        = "SecureString"
-  value       = aws_ecr_repository.lambda.repository_url
-
-  tags = merge(local.common_tags, {
-    Name = "${local.full_name}-ecr-url"
-  })
-}
-
 resource "aws_ssm_parameter" "role_arn" {
   name        = "/${var.environment}/lambda/${local.function_name}/role_arn"
   description = "Execution role ARN for ${local.function_name}"
