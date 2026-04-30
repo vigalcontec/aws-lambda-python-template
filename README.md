@@ -147,7 +147,51 @@ poetry lock
 
 > **Important:** Commit `poetry.lock` to your repository. The Docker build will fail without it.
 
-### 5. Run Locally
+### 5. Configure GitHub Secrets
+
+Add the following secrets to your GitHub repository (`Settings > Secrets and variables > Actions`):
+
+| Secret | Description |
+|--------|-------------|
+| `AWS_ROLE_ARN_DEV` | ARN of the GitHub Actions IAM role for dev |
+| `AWS_ROLE_ARN_QA` | ARN of the GitHub Actions IAM role for qa |
+| `AWS_ROLE_ARN_PROD` | ARN of the GitHub Actions IAM role for prod |
+
+> **Note:** These roles are created by the `aws-bootstrap-tfstate-oidc` repository.
+
+### 6. Enable CI/CD Workflows
+
+The workflow triggers are **commented out by default** to prevent automatic runs during setup.
+
+Edit `.github/workflows/deploy.yml` and uncomment the triggers:
+
+```yaml
+on:
+  workflow_dispatch:
+    # ... (keep this for manual runs)
+  
+  # UNCOMMENT THESE LINES:
+  push:
+    branches: [main, develop, "feature/*", "release/*"]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'Dockerfile'
+      - 'pyproject.toml'
+      - 'poetry.lock'
+      - 'terraform/**'
+      - '.github/workflows/deploy.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'Dockerfile'
+      - 'pyproject.toml'
+      - 'terraform/**'
+```
+
+### 7. Run Locally
 
 ```bash
 # Using Docker

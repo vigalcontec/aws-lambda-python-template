@@ -6,25 +6,12 @@ run-name: >-
     format('Deploy: {0}', github.ref_name)
   }}
 
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ TEMPLATE MODE: Triggers are commented out to prevent automatic runs.       │
+# │ After setup, uncomment the triggers below to enable CI/CD.                 │
+# │ See README.md "Step 5: Enable CI/CD Workflows" for instructions.           │
+# └─────────────────────────────────────────────────────────────────────────────┘
 on:
-  push:
-    branches: [main, develop, "feature/*", "release/*"]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'Dockerfile'
-      - 'pyproject.toml'
-      - 'poetry.lock'
-      - 'terraform/**'
-      - '.github/workflows/deploy.yml'
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'Dockerfile'
-      - 'pyproject.toml'
-      - 'terraform/**'
   workflow_dispatch:
     inputs:
       environment:
@@ -37,6 +24,27 @@ on:
         required: false
         type: boolean
         default: false
+  # ─────────────────────────────────────────────────────────────────────────────
+  # UNCOMMENT BELOW TO ENABLE AUTOMATIC DEPLOYMENTS
+  # ─────────────────────────────────────────────────────────────────────────────
+  # push:
+  #   branches: [main, develop, "feature/*", "release/*"]
+  #   paths:
+  #     - 'src/**'
+  #     - 'tests/**'
+  #     - 'Dockerfile'
+  #     - 'pyproject.toml'
+  #     - 'poetry.lock'
+  #     - 'terraform/**'
+  #     - '.github/workflows/deploy.yml'
+  # pull_request:
+  #   branches: [main, develop]
+  #   paths:
+  #     - 'src/**'
+  #     - 'tests/**'
+  #     - 'Dockerfile'
+  #     - 'pyproject.toml'
+  #     - 'terraform/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
