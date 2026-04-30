@@ -52,7 +52,6 @@ aws-lambda-python-template/
 │       ├── config.py               # Configuration management
 │       └── utils/
 │           ├── __init__.py
-│           ├── s3.py               # S3 utilities
 │           └── ssm.py              # SSM parameter utilities
 ├── tests/
 │   ├── __init__.py
@@ -271,7 +270,7 @@ Terraform reads SSM parameters at deploy time and injects them as Lambda environ
 
 ### GitHub Actions (Recommended)
 
-Push to branch triggers automatic deployment:
+After enabling CI/CD triggers (Step 6), push to branch triggers automatic deployment:
 
 | Branch | Environment |
 |--------|-------------|
@@ -280,6 +279,22 @@ Push to branch triggers automatic deployment:
 | `develop`, `feature/*` | dev |
 
 **No GitHub Variables needed!** Configuration is read from `terraform/config.tf`.
+
+### Manual Deploy/Destroy
+
+Use `workflow_dispatch` to manually trigger actions:
+
+1. Go to **Actions** → **Build & Deploy Lambda**
+2. Click **Run workflow**
+3. Select:
+   - **Environment:** dev, qa, or prod
+   - **Action:** `deploy` or `destroy`
+   - **Skip tests:** optionally skip test step
+
+| Action | Description |
+|--------|-------------|
+| `deploy` | Build image, push to ECR, deploy Lambda |
+| `destroy` | Terraform destroy + delete ECR repository |
 
 ### Manual Deployment
 
