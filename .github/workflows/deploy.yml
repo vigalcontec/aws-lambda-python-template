@@ -2,6 +2,7 @@ name: Build & Deploy Lambda
 run-name: >-
   ${{
     github.event_name == 'pull_request' && format('PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title) ||
+    github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy' && format('🗑️ Destroy: {0}', github.event.inputs.environment) ||
     github.event_name == 'workflow_dispatch' && format('Manual: {0}', github.event.inputs.environment) ||
     format('Deploy: {0}', github.ref_name)
   }}
@@ -19,8 +20,14 @@ on:
         required: true
         type: choice
         options: [dev, qa, prod]
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options: [deploy, destroy]
+        default: deploy
       skip_tests:
-        description: 'Skip tests'
+        description: 'Skip tests (only for deploy)'
         required: false
         type: boolean
         default: false
@@ -95,7 +102,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     needs: detect
-    if: github.event.inputs.skip_tests != 'true'
+    if: github.event.inputs.action != 'destroy' && github.event.inputs.skip_tests != 'true'
     timeout-minutes: 15
     permissions:
       contents: read
@@ -145,7 +152,7 @@ jobs:
     name: Build Image
     runs-on: ubuntu-latest
     needs: [detect, test]
-    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    if: github.event.inputs.action != 'destroy' && (needs.test.result == 'success' || needs.test.result == 'skipped')
     timeout-minutes: 20
     permissions:
       id-token: write
@@ -217,7 +224,7 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     needs: [detect, build]
-    if: github.event_name != 'pull_request'
+    if: github.event.inputs.action != 'destroy' && github.event_name != 'pull_request'
     timeout-minutes: 20
     permissions:
       id-token: write
@@ -277,3 +284,72 @@ jobs:
           echo "### ✅ Lambda Deployed" >> $GITHUB_STEP_SUMMARY
           echo "- **Function:** ${{ steps.config.outputs.function_name }}-${{ env.ENV }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Image:** ${{ needs.build.outputs.image_uri }}" >> $GITHUB_STEP_SUMMARY
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Destroy Infrastructure
+  # ─────────────────────────────────────────────────────────────────────────────
+  destroy:
+    name: Destroy
+    runs-on: ubuntu-latest
+    needs: [detect]
+    if: github.event.inputs.action == 'destroy'
+    timeout-minutes: 20
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      ENV: ${{ needs.detect.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets[format('AWS_ROLE_ARN_{0}', needs.detect.outputs.env_upper)] }}
+          role-session-name: lambda-destroy-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get Account ID
+        id: aws
+        run: echo "account_id=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_OUTPUT
+
+      - name: Read Config
+        id: config
+        run: |
+          FUNCTION_NAME=$(grep 'function_name\s*=' terraform/config.tf | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          COMPANY_NAME=$(grep 'company_name\s*=' terraform/config.tf | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "function_name=${FUNCTION_NAME}" >> $GITHUB_OUTPUT
+          echo "company_name=${COMPANY_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Terraform Init
+        run: |
+          terraform init -reconfigure \
+            -backend-config="bucket=tfstate-${{ steps.config.outputs.company_name }}-${{ env.ENV }}-${{ steps.aws.outputs.account_id }}" \
+            -backend-config="key=lambda/${{ steps.config.outputs.function_name }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true"
+        working-directory: ./terraform
+
+      - name: Terraform Destroy
+        run: |
+          terraform destroy -auto-approve -input=false \
+            -var="environment=${{ env.ENV }}" \
+            -var="image_tag=destroy"
+        working-directory: ./terraform
+
+      - name: Delete ECR Repository
+        run: |
+          REPO_NAME="${{ steps.config.outputs.function_name }}-${{ env.ENV }}"
+          aws ecr delete-repository --repository-name "${REPO_NAME}" --force || true
+        continue-on-error: true
+
+      - name: Summary
+        run: |
+          echo "### 🗑️ Infrastructure Destroyed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ env.ENV }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Function:** ${{ steps.config.outputs.function_name }}-${{ env.ENV }}" >> $GITHUB_STEP_SUMMARY
