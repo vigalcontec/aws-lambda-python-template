@@ -103,14 +103,13 @@ resource "aws_lambda_function" "main" {
 
 # -----------------------------------------------------------------------------
 # CloudWatch Log Group
+# Standard path: /aws/{project_name}/lambda/{function_name}
 # -----------------------------------------------------------------------------
 resource "aws_cloudwatch_log_group" "lambda" {
-  name              = "/aws/lambda/${local.full_name}"
+  name              = "/aws/${local.project_name}/lambda/${local.function_name}"
   retention_in_days = local.log_retention_days
 
-  tags = {
-    Name = local.full_name
-  }
+  tags = local.common_tags
 }
 
 # -----------------------------------------------------------------------------

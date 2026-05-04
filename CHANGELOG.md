@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-05-04
+
+### Changed
+
+- **SSM Parameter Paths** - Updated to standard naming convention
+  - New format: `/{env}/{project_name}/lambda/{function_name}/{parameter}`
+  - Example: `/dev/my-project/lambda/my-lambda-function/function_arn`
+- **CloudWatch Log Group** - Updated to standard naming convention
+  - New format: `/aws/{project_name}/lambda/{function_name}`
+  - Example: `/aws/my-project/lambda/my-lambda-function`
+
+### Notes
+
+- This aligns with the Step Function template naming convention
+- Enables consistent resource organization across all AWS services
+
 ## [1.0.0] - 2026-04-30
 
 ### Added
